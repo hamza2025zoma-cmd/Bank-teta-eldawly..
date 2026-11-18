@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>بنك تيته امال الدولي</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--t:#fff;--t2:rgba(255,255,255,.7);--g:rgba(255,255,255,.14);--gb:rgba(255,255,255,.35);--bg1:#1b1464;--bg2:#0b6e8a;--ok:#7dffb2;--no:#ff8a9b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+html{height:100%}
+body{margin:0;min-height:100%;font-family:'Cairo',system-ui,sans-serif;color:var(--t);background:linear-gradient(135deg,var(--bg1),var(--bg2));background-attachment:fixed;overflow-x:hidden}
+.blob{position:fixed;border-radius:50%;filter:blur(60px);opacity:.7;z-index:0;pointer-events:none}
+.b1{width:320px;height:320px;background:#ff5fa2;top:-80px;right:-60px}
+.b2{width:360px;height:360px;background:#ffb84d;bottom:-120px;left:-80px}
+.b3{width:260px;height:260px;background:#5f8bff;top:45%;left:30%}
+main{position:relative;z-index:1;max-width:560px;margin:0 auto;padding:18px 14px 40px}
+.glass{background:var(--g);border:1px solid var(--gb);border-radius:26px;backdrop-filter:blur(22px) saturate(160%);-webkit-backdrop-filter:blur(22px) saturate(160%);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 10px 30px rgba(0,0,0,.2);padding:18px;margin-bottom:14px}
+h1{margin:0;font-size:26px;font-weight:800;text-align:center}
+.sub{text-align:center;color:var(--t2);margin:2px 0 16px;font-size:14px}
+h2{margin:0 0 10px;font-size:18px}
+input,select{width:100%;padding:12px 14px;margin:5px 0;border-radius:16px;border:1px solid var(--gb);background:rgba(255,255,255,.12);color:var(--t);font:inherit;outline:none}
+select option{color:#111}
+input::placeholder{color:var(--t2)}
+button{font:inherit;font-weight:600;color:var(--t);padding:11px 16px;border-radius:16px;border:1px solid var(--gb);background:rgba(255,255,255,.22);cursor:pointer;backdrop-filter:blur(10px)}
+button:active{transform:scale(.97)}
+.main{width:100%;margin-top:6px;background:linear-gradient(135deg,rgba(255,255,255,.4),rgba(255,255,255,.15))}
+.danger{color:var(--no)}
+.bal{font-size:40px;font-weight:800;text-align:center;margin:6px 0}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.15)}
+.row:last-child{border:0}
+.sm{font-size:13px;color:var(--t2)}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.acts button{padding:7px 11px;font-size:13px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.msg{text-align:center;margin:8px 0;min-height:22px;font-size:14px}
+.in{color:var(--ok)}.out{color:var(--no)}
+
+</style>
+</head>
+<body>
+<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+<main>
+<h1 id="ttl" style="user-select:none">🏦 بنك تيته امال الدولي</h1>
+<div class="sub">بنك العيلة · الحد الأقصى 10 حسابات</div>
+<div id="app"><div class="glass msg">جاري التحميل...</div></div>
+</main>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+const ADMIN_NAME="Hamza",ADMIN_PASS="Hamza@1612",MAX=10;
+const S={accs:[],tx:[],me:null,admin:false,msg:"",ok:true,ready:false,sel:"",showAdmin:location.hash==="#admin"};
+let taps=0,tapT=null;
+let db=null;
+try{S.me=sessionStorage.getItem("bk_me")||null;S.admin=sessionStorage.getItem("bk_admin")==="1"}catch(e){}
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=n=>Number(n||0).toLocaleString("en-US");
+const save=()=>{try{S.me?sessionStorage.setItem("bk_me",S.me):sessionStorage.removeItem("bk_me");sessionStorage.setItem("bk_admin",S.admin?"1":"0")}catch(e){}};
+const say=(m,ok=true)=>{S.msg=m;S.ok=ok;render()};
+const byId=id=>S.accs.find(a=>a.id===id);
+const byName=n=>S.accs.find(a=>a.name.trim().toLowerCase()===n.trim().toLowerCase());
+const val=id=>($("#"+id)||{}).value||"";
+
+function render(){
+  if(!S.ready)return;
+  if(document.activeElement&&document.activeElement.tagName==="INPUT"){return}
+  const m=`<div class="msg" style="color:${S.ok?'var(--ok)':'var(--no)'}">${esc(S.msg)}</div>`;
+  const me=S.me?byId(S.me):null;
+  if(S.me&&!me&&!S.admin){S.me=null;save()}
+  let h="";
+  if(S.admin)h=adminView(m);
+  else if(me)h=userView(me,m);
+  else h=loginView(m);
+  $("#app").innerHTML=h;
+}
+function loginFields(){
+  const x=byId(S.sel);if(!x)return "";
+  const hz=x.name.trim().toLowerCase()==="hamza";
+  if(hz||x.pin)return `<input id="lg-pin" type="password" placeholder="ادخل كلمة السر" autocapitalize="off" autocorrect="off" spellcheck="false">`;
+  return `<div class="sm">أول مرة؟ اعمل كلمة سر لحسابك</div><input id="lg-pin" type="password" placeholder="كلمة السر الجديدة"><input id="lg-pin2" type="password" placeholder="أكّد كلمة السر">`;
+}
+function loginView(m){
+  const opts=S.accs.map(a=>`<option value="${a.id}"${S.sel===a.id?" selected":""}>${esc(a.name)}</option>`).join("");
+  return `<div class="glass"><h2>دخول حساب</h2>
+  <select id="lg-acc"><option value="">اختار اسمك</option>${opts}</select>
+  ${loginFields()}
+  <button class="main" data-act="login">دخول</button></div>
+  ${S.showAdmin?`<div class="glass"><h2>دخول الأدمن</h2>
+  <input id="ad-n" placeholder="اسم الأدمن" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+  <input id="ad-p" type="password" placeholder="الباسورد" autocapitalize="off" autocorrect="off" spellcheck="false">
+  <button class="main" data-act="adlogin">دخول كأدمن</button></div>`:""}${m}`;
+}
+function txList(filterId){
+  const l=S.tx.filter(t=>!filterId||t.fromId===filterId||t.toId===filterId).slice(0,12);
+  if(!l.length)return `<div class="sm">مفيش عمليات لسه</div>`;
+  return l.map(t=>{
+    const inn=filterId&&t.toId===filterId;
+    const title=filterId?(inn?`وصلك تحويل من ${t.from}`:`حوّلت إلى ${t.to}`):`${t.from} حوّل إلى ${t.to}`;
+    const reason=t.note?`السبب: ${t.note}`:"";
+    const when=t.t?new Date(t.t).toLocaleString("ar-EG"):"";
+    return `<div class="row"><div><b>${esc(title)}</b><div class="sm">${reason?esc(reason):""}</div><div class="sm">${esc(when)}</div></div><b class="${filterId?(inn?'in':'out'):''}">${filterId?(inn?'+':'−'):''}${fmt(t.amt)} جنيه</b></div>`}).join("");
+}
+
+function userView(me,m){
+  const others=S.accs.filter(a=>a.id!==me.id).map(a=>`<option>${esc(a.name)}</option>`).join("");
+  return `<div class="glass"><div class="top"><b>أهلاً ${esc(me.name)} 👋</b><button data-act="logout">خروج</button></div>
+  <div class="sm" style="text-align:center">رصيدك</div><div class="bal">${fmt(me.balance)} 💰</div></div>
+  <div class="glass"><h2>تحويل فلوس</h2>
+  <input id="tr-n" list="names" placeholder="اسم المستلم"><datalist id="names">${others}</datalist>
+  <input id="tr-a" type="number" inputmode="numeric" min="1" placeholder="المبلغ">
+  <input id="tr-reason" maxlength="120" placeholder="سبب التحويل (مثال: تمن اللعبة كدا)">
+  <button class="main" data-act="transfer">حوّل</button>${m}</div>
+  <div class="glass"><h2>عملياتي</h2>${txList(me.id)}</div>`;
+}
+function adminView(m){
+  const rows=S.accs.map(a=>`<div class="row" style="flex-direction:column;align-items:stretch">
+   <div style="display:flex;justify-content:space-between"><b>${esc(a.name)}</b><b>${fmt(a.balance)}</b></div>
+   <div class="sm">${a.pin?"كلمة السر: "+esc(a.pin):"من غير كلمة سر"}</div>
+   <div class="acts"><input id="v-${a.id}" type="number" placeholder="مبلغ" style="width:90px;margin:0">
+   <button data-act="add" data-id="${a.id}">➕ إضافة</button><button data-act="sub" data-id="${a.id}">➖ سحب</button>
+   <button data-act="set" data-id="${a.id}">= تحديد</button><button data-act="clr" data-id="${a.id}">🔑 مسح كلمة السر</button><button class="danger" data-act="del" data-id="${a.id}">حذف</button></div></div>`).join("");
+  return `<div class="glass"><div class="top"><b>لوحة الأدمن 👑 Hamza</b><button data-act="logout">خروج</button></div>
+  <div class="sm">إجمالي الفلوس في البنك: <b>${fmt(S.accs.reduce((s,a)=>s+Number(a.balance||0),0))}</b> · الحسابات ${S.accs.length}/${MAX}</div></div>
+  <div class="glass"><h2>حساب جديد</h2>
+  <input id="n-name" placeholder="الاسم">
+  <input id="n-pin" placeholder="كلمة سر للحساب (اختياري)">
+  <input id="n-bal" type="number" placeholder="رصيد مبدئي (الافتراضي 10,000 جنيه)">
+  <button class="main" data-act="create">إنشاء الحساب</button>${m}</div>
+  
+  <div class="glass"><h2>المحافظ</h2>${rows||'<div class="sm">مفيش حسابات لسه</div>'}</div>
+  <div class="glass"><h2>كل العمليات</h2>${txList(null)}</div>`;
+}
+async function logTx(from,to,amt,note){
+  const id="t"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  await db.collection("tx").doc(id).set({from:from.name,fromId:from.id,to:to.name,toId:to.id,amt,note:note||"",t:Date.now()});
+}
+const ADM={id:"admin",name:"البنك"};
+let eventTarget=null;
+async function act(a,id){
+  try{
+    if(a==="login"){const x=byId(val("lg-acc"));if(!x)return say("اختار اسمك",false);const p=val("lg-pin").trim();if(x.name.trim().toLowerCase()==="hamza"){if(p!==ADMIN_PASS)return say("الباسورد غلط",false);S.admin=true;S.me=null;save();S.msg="";return render()}if(x.pin){if(x.pin!==p)return say("كلمة السر غلط",false)}else{if(p.length<3)return say("اكتب كلمة سر (3 حروف على الأقل)",false);if(p!==val("lg-pin2").trim())return say("كلمتين السر مش زي بعض",false);await db.collection("accounts").doc(x.id).update({pin:p})}S.me=x.id;S.admin=false;save();S.msg="";return render()}
+    if(a==="adlogin"){if(val("ad-n").trim().toLowerCase()!==ADMIN_NAME.toLowerCase()||val("ad-p").trim()!==ADMIN_PASS)return say("بيانات الأدمن غلط",false);S.admin=true;S.me=null;save();S.msg="";return render()}
+    if(a==="logout"){S.me=null;S.admin=false;save();S.msg="";return render()}
+    if(a==="create"){
+      const name=val("n-name").trim(),pin=val("n-pin").trim(),bal=val("n-bal").trim()===""?10000:Math.max(0,Math.floor(Number(val("n-bal"))||0));
+      if(!name)return say("اكتب الاسم",false);
+      if(S.accs.length>=MAX)return say("وصلنا للحد الأقصى 10 حسابات",false);
+      if(byName(name))return say("الاسم ده موجود بالفعل",false);
+      const id="a"+Date.now().toString(36);
+      await db.collection("accounts").doc(id).set({name,pin,balance:bal,t:Date.now()});
+      return say("تم إنشاء حساب "+name+" ✅");
+    }
+    const x=byId(id);
+    if(a==="clr"){await db.collection("accounts").doc(id).update({pin:""});return say("اتمسحت كلمة سر "+x.name+" ✅")}
+    if(a==="del"){if(!x||!confirm("تحذف حساب "+x.name+"؟"))return;await db.collection("accounts").doc(id).delete();return say("تم الحذف")}
+    if(a==="add"||a==="sub"||a==="set"){
+      const v=Math.floor(Number(val("v-"+id)));if(!(v>=0)||isNaN(v))return say("اكتب مبلغ صحيح",false);
+      let nb=a==="add"?x.balance+v:a==="sub"?Math.max(0,x.balance-v):v;
+      await db.collection("accounts").doc(id).update({balance:nb});
+      if(a==="add")await logTx(ADM,x,v,"إيداع من الأدمن");
+      if(a==="sub")await logTx(x,ADM,Math.min(v,x.balance),"سحب بواسطة الأدمن");
+      return say("تم تعديل رصيد "+x.name+" ✅");
+    }
+
+    if(a==="transfer"){
+      const me=byId(S.me),to=byName(val("tr-n")),amt=Math.floor(Number(val("tr-a"))),reason=val("tr-reason").trim();
+      if(!to)return say("مفيش حساب بالاسم ده",false);
+      if(to.id===me.id)return say("مينفعش تحوّل لنفسك",false);
+      if(!(amt>0))return say("اكتب مبلغ صحيح",false);
+      if(!reason)return say("اكتب سبب التحويل عشان يظهر للمستلم",false);
+      const fresh=(await db.collection("accounts").doc(me.id).get()).data();
+      if(!fresh||fresh.balance<amt)return say("رصيدك مش كفاية",false);
+            const FV=firebase.firestore.FieldValue;const batch=db.batch();
+      batch.update(db.collection("accounts").doc(me.id),{balance:FV.increment(-amt)});
+      batch.update(db.collection("accounts").doc(to.id),{balance:FV.increment(amt)});
+      await batch.commit();
+      await logTx(me,to,amt,reason);
+      return say("تم تحويل "+fmt(amt)+" جنيه إلى "+to.name+" بسبب: "+reason+" ✅");
+    }
+  }catch(e){say("حصلت مشكلة: "+(e&&e.message||e),false)}
+}
+document.addEventListener("click",e=>{if(e.target.closest("#ttl")){taps++;clearTimeout(tapT);tapT=setTimeout(()=>taps=0,2000);if(taps>=5){taps=0;S.showAdmin=true;render()}}const b=e.target.closest("[data-act]");if(b){eventTarget=b;act(b.dataset.act,b.dataset.id)}});
+document.addEventListener("change",e=>{if(e.target.id==="lg-acc"){S.sel=e.target.value;S.msg="";render()}});
+window.addEventListener("hashchange",()=>{S.showAdmin=location.hash==="#admin";render()});
+document.addEventListener("focusout",()=>setTimeout(render,150));
+// ===== Firebase / Firestore =====
+// حط هنا إعدادات مشروعك (Project settings > Your apps > Web app > firebaseConfig)
+let firebaseConfig={
+  apiKey:"AIzaSyBw2BXQ0bubipE0PnTbHBa128zBV8EJPpc",
+  authDomain:"bank-teta.firebaseapp.com",
+  projectId:"bank-teta",
+  storageBucket:"bank-teta.firebasestorage.app",
+  messagingSenderId:"185129169349",
+  appId:"1:185129169349:web:192fa3c7ba7fbd09ba5bac"
+};
+try{const c=JSON.parse(localStorage.getItem("fb_cfg")||"null");if(c)firebaseConfig=c}catch(e){}
+function setupForm(){
+  $("#app").innerHTML='<div class="glass"><h2>إعداد أول مرة</h2><div class="sm">اكتب اسم مشروع Firebase (Project ID). ده بس.</div><input id="s-pid" placeholder="Project ID" autocapitalize="off" autocorrect="off" spellcheck="false"><div class="sm">مفتاح apiKey (اختياري، لو الأول مشتغلش ضيفه)</div><input id="s-key" placeholder="AIza..." autocapitalize="off" autocorrect="off" spellcheck="false"><button class="main" id="s-go">حفظ وتشغيل</button></div>';
+  $("#s-go").onclick=()=>{
+    const pid=$("#s-pid").value.trim(),key=$("#s-key").value.trim();
+    if(!pid)return;
+    localStorage.setItem("fb_cfg",JSON.stringify({projectId:pid,apiKey:key||"x",authDomain:pid+".firebaseapp.com"}));
+    location.reload();
+  };
+}
+const showFatal=m=>{$("#app").innerHTML='<div class="glass msg" style="color:var(--no)">'+esc(m)+'<br><br><button id="s-reset">إعادة الإعداد</button></div>';const r=$("#s-reset");if(r)r.onclick=()=>{localStorage.removeItem("fb_cfg");location.reload()}};
+const FAMILY=["Hamza","Omar","Farah","Malak","Rana","Ahmed"];
+(async()=>{
+  try{
+    if(typeof firebase==="undefined")throw new Error("مكتبة Firebase ماتحملتش. اتأكد من النت أو من إن الملف متفتحش بحاجة بتحجب gstatic.com");
+    if(!firebaseConfig){setupForm();return}
+    firebase.initializeApp(firebaseConfig);
+    db=firebase.firestore();
+    let seeded=false;
+    db.collection("accounts").onSnapshot(snap=>{
+      if(snap.empty&&!seeded){
+        seeded=true;
+        FAMILY.forEach((name,i)=>db.collection("accounts").doc("family_"+name.toLowerCase()).set({name,pin:"",balance:0,t:Date.now()+i}).catch(e=>showFatal("مش قادر أكتب في Firestore: "+e.message)));
+      }
+      S.accs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.t||0)-(b.t||0));
+      S.ready=true;render();
+    },e=>showFatal("خطأ في تحميل الحسابات: "+e.message+" — غالباً قواعد Firestore (Rules) بتمنع القراءة"));
+    db.collection("tx").onSnapshot(snap=>{
+      S.tx=snap.docs.map(d=>d.data()).sort((a,b)=>b.t-a.t);render();
+    },e=>console.error("tx:",e));
+  }catch(e){showFatal("تعذر تشغيل البنك: "+(e&&e.message||e));}
+})();
+</script>
+</body>
+</html>
